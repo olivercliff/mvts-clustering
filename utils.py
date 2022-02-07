@@ -34,7 +34,7 @@ def _reweight(x,ts=(0.75,0.5,0.25),ws=(2,0.75,0.1)):
 def _nudge(pos, x_shift, y_shift):
     return {n:(x + x_shift, y + y_shift) for n,(x,y) in pos.items()}
 
-def draw_network(adj,f=None,squared=False,node_color=None,color_labels=None,labels_on=False,pos=None,layout='spring',seed=1,use_kk=True,savedir=None,ts=None,ws=None,alpha=None):
+def draw_network(adj,f=None,squared=False,node_color=None,color_labels=None,labels_on=False,pos=None,layout='spring',seed=1,use_kk=True,savedir=None,ts=None,ws=None,alpha=None,mvts=None):
 
     if ts is None:
         if adj.shape[0] < 50:
@@ -67,9 +67,11 @@ def draw_network(adj,f=None,squared=False,node_color=None,color_labels=None,labe
             raise ValueError('pos must be included if layout is not spring.')
 
         weights = [_reweight(G[u][v]['weight'],ts=ts,ws=ws) for u, v in G.edges()]
+        if node_color is not None:
+            node_color = [node_color[f] for f in pos]
         nx.draw(G,pos=pos,ax=ax,with_labels=False,node_size=250,
                     edgecolors='k',edge_color=None,width=weights,
-                    node_color=[node_color[f] for f in pos],alpha=alpha)
+                    node_color=node_color,alpha=alpha)
 
         pos_labels = _nudge(pos,0,0.02)
         if labels_on:
@@ -100,8 +102,22 @@ def draw_network(adj,f=None,squared=False,node_color=None,color_labels=None,labe
             _ = nx.draw_networkx_labels(G,pos=pos,ax=ax,font_size=1)
             plt.margins(x=0.4)
         title = 'network'
-        
+
     ax = plt.gca()
+    if mvts is not None:
+        offset = 0.05
+        xlen = 0.4
+        ylen = 0.18
+        for p in pos:
+            try:
+                Z = mvts[p]['data'].T
+                xmin = pos[p][0]+offset
+                ymin = pos[p][1]+offset
+                Y, X = np.mgrid[ymin:ymin+ylen:ylen/Z.shape[0],xmin:xmin+xlen:xlen/Z.shape[1]]
+                ax.pcolormesh(X,Y,Z,cmap=sns.color_palette('icefire_r', as_cmap=True))
+            except KeyError:
+                print(f'Cannot find data matrix for {p}')
+        
     if color_labels is not None:
         ns = []
         for l in color_labels:
@@ -118,7 +134,7 @@ def draw_network(adj,f=None,squared=False,node_color=None,color_labels=None,labe
         ax.legend(ns,[n.get_label() for n in ns],loc=1)
         ax.add_artist(legend1)
 
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.axis('off')
     if savedir is not None:
         path = os.path.join(savedir,title+'.pdf')
@@ -527,7 +543,7 @@ def dataspace(cf,classes=None,reducer='pca',absolute=True,include_size=False,plo
     if not plot_nas:
         embeddf = embeddf[embeddf['class'] != 'N/A']
 
-    fig, _ = plt.subplots(1,1)
+    fig, _ = plt.subplots(figsize=(10,10))
     try:
         if include_size:
             sns.scatterplot(data=embeddf,x=xlabel,y=ylabel,hue='class',size='n_procs',alpha=.8,sizes=(50,200),**scatterplot_kwargs)
@@ -540,7 +556,9 @@ def dataspace(cf,classes=None,reducer='pca',absolute=True,include_size=False,plo
             sns.scatterplot(data=embeddf,x=xlabel,y=ylabel,alpha=.8,**scatterplot_kwargs)
     # plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     # plt.legend(bbox_to_anchor=(0.5, 1.05), loc='lower center', borderaxespad=0., ncol=3)
-    plt.legend()
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05),
+                ncol=3, fancybox=True, shadow=True)
+    #plt.legend()
 
     return fig, embeddf
 
